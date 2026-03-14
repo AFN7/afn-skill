@@ -8,7 +8,7 @@ Fully autonomous development agent for Claude Code. Give it a single sentence, i
 
 ### As Claude Code Plugin
 ```bash
-claude plugin add github:afn7/afn-skill
+claude plugin add github:AFN7/afn-skill
 ```
 
 ### Manual
@@ -28,25 +28,25 @@ source ~/.bashrc
 
 ### Inside Claude Code (single context)
 ```
-/afn Build me a radio website
+/afn Build a real-time dashboard with auth and analytics
 /afn requirements.md
 /afn Fix this bug: login not working
 /afn Add dark mode to existing project
 /afn                                    # Resume from where you left off
 ```
 
-### From Terminal (unlimited loop - no context rot)
+### From Terminal (unlimited loop — no context rot)
 ```bash
-afn "Build me a radio website"          # New project - loops until done
-afn                                      # Resume from .afn/STATE.md
-afn --budget 1 "Large project"          # $1 per iteration (fresh context each time)
-afn --max-iter 10 "Quick task"          # Max 10 iterations
+afn "Create a full-stack booking system"    # New project — loops until done
+afn                                          # Resume from .afn/STATE.md
+afn --budget 1 "Portfolio site with CMS"    # $1 per iteration (fresh context each time)
+afn --max-iter 10 "REST API with auth"      # Max 10 iterations
 ```
 
 ## How It Works
 
 ```
-Terminal: afn "Build radio site"
+Terminal: afn "Create a full-stack booking system"
             ↓
       afn-loop.sh (bash)
             ↓

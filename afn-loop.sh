@@ -4,10 +4,10 @@
 # Does NOT stop until STATE.md says "COMPLETED".
 #
 # Usage:
-#   afn "Build me a radio website"              # New project
+#   afn "Create a full-stack booking system"              # New project
 #   afn                                          # Resume (if STATE.md exists)
-#   afn "new: E-commerce platform"              # Start fresh
-#   afn --budget 1 "Radio website"              # Max $1 per iteration
+#   afn "new: Real-time chat app"              # Start fresh
+#   afn --budget 1 "Portfolio site with CMS"              # Max $1 per iteration
 #   afn --max-iter 10 "Large project"           # Max 10 iterations
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -122,7 +122,7 @@ if [ -z "$TASK" ] && [ -f "$STATE_FILE" ]; then
   log "Existing state found. Resuming..."
   USER_PROMPT=$(build_prompt "")
 elif [ -z "$TASK" ] && [ ! -f "$STATE_FILE" ]; then
-  error "Nothing to do. Example: afn \"Build me a radio website\""
+  error "Nothing to do. Example: afn \"Create a full-stack booking system\""
   exit 1
 else
   USER_PROMPT=$(build_prompt "$TASK")

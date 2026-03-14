@@ -13,10 +13,10 @@ No context limits — state persists to files, resumes seamlessly across session
 
 **From terminal (unlimited loop — no context rot):**
 ```bash
-afn "Build me a radio website"              # New project — loops until done
+afn "Create a full-stack booking system"              # New project — loops until done
 afn                                          # Resume from .afn/STATE.md
-afn "new: E-commerce platform"              # Archive old state, start fresh
-afn --budget 1 "Radio website"              # Max $1 per iteration
+afn "new: Real-time chat app"              # Archive old state, start fresh
+afn --budget 1 "Portfolio site with CMS"              # Max $1 per iteration
 afn --max-iter 10 "Large project"           # Max 10 iterations
 ```
 Runs `afn-loop.sh` — automatically opens fresh context when budget/context fills.
@@ -24,12 +24,12 @@ Does NOT stop until all tasks are complete. Ctrl+C to abort.
 
 **Inside Claude Code session (single context):**
 ```
-/afn Build me a radio website
+/afn Create a full-stack booking system
 /afn requirements.md
 /afn Fix this bug: login not working
 /afn Add dark mode to existing project
 /afn                                        # Resume from where left off
-/afn new: E-commerce platform               # Archive old, start fresh
+/afn new: Real-time chat app               # Archive old, start fresh
 ```
 
 ## Entry Flow — Every Invocation Starts Here
@@ -71,7 +71,7 @@ All state lives in `.afn/` in the project directory. Survives context resets.
   DESIGN.md         # Design decisions, style guide
   RESEARCH.md       # Research findings summary
   archive/          # Previous project states
-    2026-03-15_radio-site/
+    2026-03-15_my-project/
 ```
 
 ### STATE.md format:
@@ -79,11 +79,11 @@ All state lives in `.afn/` in the project directory. Survives context resets.
 # AFN State
 
 ## Project
-- **Description:** Radio website
+- **Description:** Portfolio site with CMS
 - **Type:** Greenfield (web)
 - **Tech stack:** Next.js + Tailwind
 - **Started:** 2026-03-15
-- **Directory:** /home/user/projects/radio-site
+- **Directory:** /home/user/projects/my-project
 
 ## Current Phase
 IMPLEMENT (Phase 4)
