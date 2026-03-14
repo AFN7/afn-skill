@@ -5,125 +5,127 @@ description: Use when user invokes /afn with ANY request - a single sentence, a 
 
 # AFN - Autonomous Full Intelligence
 
-Tam otonom gelistirme ajansi. Kullanici ne istedigini soyler, gerisi otomatik.
-Her proje tipi, her boyut, her karmasiklik seviyesi. Kullanicinin aklina gelmeyen seyleri de yapar.
-Context siniri yok — state persist eder, yeni oturumda kaldigindan devam eder.
+Fully autonomous development agent. User says what they want, everything else is automatic:
+research, design, planning, implementation, verification. Thinks of things the user didn't mention.
+No context limits — state persists to files, resumes seamlessly across sessions.
 
-## Kullanim
+## Usage
 
-**Terminal'den (otonom dongu — context siniri YOK):**
+**From terminal (unlimited loop — no context rot):**
 ```bash
-afn "Bana radyo sitesi yap"         # Yeni proje — bitene kadar dongu
-afn                                  # Devam — kaldigi yerden surer
-afn "yeni: E-ticaret sitesi yap"    # Sifirdan basla
+afn "Build me a radio website"              # New project — loops until done
+afn                                          # Resume from .afn/STATE.md
+afn "new: E-commerce platform"              # Archive old state, start fresh
+afn --budget 1 "Radio website"              # Max $1 per iteration
+afn --max-iter 10 "Large project"           # Max 10 iterations
 ```
-Bu komut `afn-loop.sh` script'ini calistirir. Claude context dolunca otomatik yeni context acar.
-Tum gorevler tamamlanana kadar DURMAZ. Durdurmak icin: Ctrl+C
+Runs `afn-loop.sh` — automatically opens fresh context when budget/context fills.
+Does NOT stop until all tasks are complete. Ctrl+C to abort.
 
-**Claude oturumu icinden (tek context):**
+**Inside Claude Code session (single context):**
 ```
-/afn Bana radyo sitesi yap          # Yeni proje baslatir
-/afn requirements.md                 # Spec dosyasindan baslatir
-/afn Bu bug'i duzelt: X calismıyor   # Bug fix modu
-/afn Mevcut projeye dark mode ekle   # Feature ekleme modu
-/afn                                 # DEVAM — kaldigi yerden surer
-/afn yeni: E-ticaret sitesi yap      # Mevcut state'i arsivler, sifirdan baslar
+/afn Build me a radio website
+/afn requirements.md
+/afn Fix this bug: login not working
+/afn Add dark mode to existing project
+/afn                                        # Resume from where left off
+/afn new: E-commerce platform               # Archive old, start fresh
 ```
 
-## Giris Akisi — Her Cagri Bununla Baslar
+## Entry Flow — Every Invocation Starts Here
 
 ```dot
 digraph entry {
   rankdir=TB;
   node [fontsize=11];
 
-  "afn cagrildi" [shape=box];
-  ".afn/STATE.md var mi?" [shape=diamond];
-  "Arguman var mi?" [shape=diamond];
-  "DEVAM MODU" [shape=box, style=bold, color=blue];
-  "'yeni:' ile mi basliyor?" [shape=diamond];
-  "Eski state'i arsivle" [shape=box];
-  "YENI PROJE MODU" [shape=box, style=bold, color=green];
+  "afn invoked" [shape=box];
+  ".afn/STATE.md exists?" [shape=diamond];
+  "Has arguments?" [shape=diamond];
+  "RESUME MODE" [shape=box, style=bold, color=blue];
+  "Starts with 'new:'?" [shape=diamond];
+  "Archive old state" [shape=box];
+  "NEW PROJECT MODE" [shape=box, style=bold, color=green];
 
-  "afn cagrildi" -> ".afn/STATE.md var mi?";
-  ".afn/STATE.md var mi?" -> "Arguman var mi?" [label="evet"];
-  ".afn/STATE.md var mi?" -> "Arguman var mi?" [label="hayir"];
-  "Arguman var mi?" -> "DEVAM MODU" [label="hayir + state var"];
-  "Arguman var mi?" -> "'yeni:' ile mi basliyor?" [label="evet"];
-  "Arguman var mi?" -> "YENI PROJE MODU" [label="hayir + state yok"];
-  "'yeni:' ile mi basliyor?" -> "Eski state'i arsivle" [label="evet"];
-  "'yeni:' ile mi basliyor?" -> "YENI PROJE MODU" [label="hayir + state yok"];
-  "'yeni:' ile mi basliyor?" -> "Eski state'i arsivle" [label="hayir + state var (sor)"];
-  "Eski state'i arsivle" -> "YENI PROJE MODU";
+  "afn invoked" -> ".afn/STATE.md exists?";
+  ".afn/STATE.md exists?" -> "Has arguments?" [label="yes"];
+  ".afn/STATE.md exists?" -> "Has arguments?" [label="no"];
+  "Has arguments?" -> "RESUME MODE" [label="no + state exists"];
+  "Has arguments?" -> "Starts with 'new:'?" [label="yes"];
+  "Has arguments?" -> "NEW PROJECT MODE" [label="no + no state"];
+  "Starts with 'new:'?" -> "Archive old state" [label="yes"];
+  "Starts with 'new:'?" -> "NEW PROJECT MODE" [label="no + no state"];
+  "Starts with 'new:'?" -> "Archive old state" [label="no + state exists (ask)"];
+  "Archive old state" -> "NEW PROJECT MODE";
 }
 ```
 
-## State Yonetimi (.afn/ dizini)
+## State Management (.afn/ directory)
 
-Tum state proje dizininde `.afn/` klasorunde tutulur. Context sifirlandiginda buradan kurtarilir.
+All state lives in `.afn/` in the project directory. Survives context resets.
 
-### Dosya yapisi:
+### File structure:
 ```
 .afn/
-  STATE.md          # Ana durum dosyasi — her zaman guncel
-  DESIGN.md         # Tasarim kararlari, stil rehberi
-  RESEARCH.md       # Arastirma sonuclari ozeti
-  archive/          # Onceki calismalarin arsivi
-    2026-03-15_radyo-sitesi/
+  STATE.md          # Current status — always up to date
+  DESIGN.md         # Design decisions, style guide
+  RESEARCH.md       # Research findings summary
+  archive/          # Previous project states
+    2026-03-15_radio-site/
 ```
 
-### STATE.md formati:
+### STATE.md format:
 ```markdown
 # AFN State
 
-## Proje
-- **Tanim:** Radyo sitesi
-- **Tip:** Sifirdan proje (web)
+## Project
+- **Description:** Radio website
+- **Type:** Greenfield (web)
 - **Tech stack:** Next.js + Tailwind
-- **Baslangic:** 2026-03-15
-- **Dizin:** /home/afn7/Creativity/radio-site
+- **Started:** 2026-03-15
+- **Directory:** /home/user/projects/radio-site
 
-## Mevcut Faz
-UYGULA (Faz 4)
+## Current Phase
+IMPLEMENT (Phase 4)
 
-## Gorevler
-- [x] Proje iskeleti olustur
-- [x] Ana layout + navigasyon
-- [x] Ana sayfa
-- [ ] Canli yayin sayfasi        ← SIRADAKI
-- [ ] Program akisi sayfasi
-- [ ] Hakkimizda sayfasi
+## Tasks
+- [x] Project scaffold
+- [x] Main layout + navigation
+- [x] Home page
+- [ ] Live stream page          ← NEXT
+- [ ] Schedule page
+- [ ] About page
 - [ ] SEO + meta tags
-- [ ] Final tarama
+- [ ] Final review
 
-## Son Durum
-Canli yayin sayfasi baslanacak. Audio player komponenti yazilacak.
+## Last Status
+Live stream page is next. Audio player component needs to be built.
 
-## Blocker
-(yok)
+## Blockers
+(none)
 
-## Kararlar Loglari
-- Next.js secildi: SSR + SEO uyumu icin
-- Tailwind secildi: hizli UI gelistirme
-- Renk paleti: koyu mavi (#1a1a2e) + turuncu (#e94560)
+## Decision Log
+- Next.js chosen: SSR + SEO compatibility
+- Tailwind chosen: rapid UI development
+- Color palette: dark blue (#1a1a2e) + orange (#e94560)
 ```
 
-### State guncelleme kurallari:
-- Her gorev tamamlandiginda STATE.md guncelle
-- Her faz gecisinde guncelle
-- Blocker olustu/cozulduyse guncelle
-- DESIGN.md'yi sadece tasarim fazinda yaz, sonra referans olarak kullan
-- STATE.md KISA ve OKUNABILIR tutulmali — roman degil, durum raporu
+### State update rules:
+- Update STATE.md after EVERY completed task
+- Update on every phase transition
+- Update when blockers appear/resolve
+- Write DESIGN.md only during design phase, then use as reference
+- Keep STATE.md SHORT and SCANNABLE — status report, not novel
 
-## DEVAM MODU
+## RESUME MODE
 
-`/afn` argumansiz cagrildiginda veya yeni context'te:
+When `/afn` is called with no arguments or in a new context:
 
-1. `.afn/STATE.md` oku
-2. `.afn/DESIGN.md` oku (tasarim referansi icin)
-3. Mevcut fazi ve siradaki gorevi belirle
-4. Kullaniciya 1 satirlik durum ver: `"Devam ediyorum: Canli yayin sayfasi (4/8 gorev tamam)"`
-5. Kaldigin yerden HEMEN devam et — soru sorma
+1. Read `.afn/STATE.md`
+2. Read `.afn/DESIGN.md` (design reference)
+3. Identify current phase and next task
+4. Give user 1-line status: `"Resuming: Live stream page (4/8 tasks done)"`
+5. IMMEDIATELY continue — do not ask questions
 
 ## Core Loop
 
@@ -132,214 +134,214 @@ digraph afn {
   rankdir=TB;
   node [fontsize=11];
 
-  "BAGLAM TOPLA" [shape=box];
-  "SINIFLA" [shape=diamond];
-  "ARASTIR" [shape=box, style=bold];
-  "TASARLA + DESIGN.md" [shape=box, style=bold];
-  "PLANLA + STATE.md" [shape=box, style=bold];
-  "UYGULA" [shape=box, style=bold];
-  "DOGRULA" [shape=diamond, style=bold];
-  "ISARETLE + STATE guncelle" [shape=box];
-  "Kalan var mi?" [shape=diamond];
-  "FINAL TARAMA" [shape=box, style=bold];
-  "TESLIM" [shape=doublecircle];
+  "GATHER CONTEXT" [shape=box];
+  "CLASSIFY" [shape=diamond];
+  "RESEARCH" [shape=box, style=bold];
+  "DESIGN + DESIGN.md" [shape=box, style=bold];
+  "PLAN + STATE.md" [shape=box, style=bold];
+  "IMPLEMENT" [shape=box, style=bold];
+  "VERIFY" [shape=diamond, style=bold];
+  "MARK + update STATE" [shape=box];
+  "Remaining?" [shape=diamond];
+  "FINAL REVIEW" [shape=box, style=bold];
+  "DELIVER" [shape=doublecircle];
 
-  "BAGLAM TOPLA" -> "SINIFLA";
-  "SINIFLA" -> "ARASTIR";
-  "ARASTIR" -> "TASARLA + DESIGN.md";
-  "TASARLA + DESIGN.md" -> "PLANLA + STATE.md";
-  "PLANLA + STATE.md" -> "UYGULA";
-  "UYGULA" -> "DOGRULA";
-  "DOGRULA" -> "ISARETLE + STATE guncelle" [label="OK"];
-  "DOGRULA" -> "UYGULA" [label="tekrar"];
-  "ISARETLE + STATE guncelle" -> "Kalan var mi?";
-  "Kalan var mi?" -> "UYGULA" [label="evet"];
-  "Kalan var mi?" -> "FINAL TARAMA" [label="hayir"];
-  "FINAL TARAMA" -> "UYGULA" [label="eksik bulundu"];
-  "FINAL TARAMA" -> "TESLIM" [label="tamam"];
+  "GATHER CONTEXT" -> "CLASSIFY";
+  "CLASSIFY" -> "RESEARCH";
+  "RESEARCH" -> "DESIGN + DESIGN.md";
+  "DESIGN + DESIGN.md" -> "PLAN + STATE.md";
+  "PLAN + STATE.md" -> "IMPLEMENT";
+  "IMPLEMENT" -> "VERIFY";
+  "VERIFY" -> "MARK + update STATE" [label="OK"];
+  "VERIFY" -> "IMPLEMENT" [label="retry"];
+  "MARK + update STATE" -> "Remaining?";
+  "Remaining?" -> "IMPLEMENT" [label="yes"];
+  "Remaining?" -> "FINAL REVIEW" [label="no"];
+  "FINAL REVIEW" -> "IMPLEMENT" [label="gaps found"];
+  "FINAL REVIEW" -> "DELIVER" [label="clean"];
 }
 ```
 
-## FAZ 0: BAGLAM TOPLAMA
+## PHASE 0: GATHER CONTEXT
 
-Herhangi bir is yapmadan ONCE:
+Before doing ANY work:
 
-**Ortam tespiti (paralel calistir):**
-- `pwd` + `ls` — neredeyiz, ne var?
-- `git status` — repo mu, branch ne?
-- `cat package.json / requirements.txt / go.mod` vb. — mevcut stack
-- `cat CLAUDE.md` — proje kurallari
-- `.afn/STATE.md` var mi? — devam durumu
-- Memory sistemi kontrol et — kullanici tercihleri
+**Environment detection (run in parallel):**
+- `pwd` + `ls` — where are we, what exists?
+- `git status` — is this a repo, what branch?
+- `cat package.json / requirements.txt / go.mod` etc. — existing stack?
+- `cat CLAUDE.md` — project rules?
+- `.afn/STATE.md` exists? — resume state?
+- Check memory system — user preferences?
 
-**Proje siniflandirmasi:**
+**Project classification:**
 
-| Sinif | Tespit | Davranis |
-|-------|--------|----------|
-| **Sifirdan proje** | Bos dizin veya yeni isim | Tam arastirma + tasarim + uygulama |
-| **Mevcut projeye ekleme** | package.json vb. var | Mevcut stack'e uy, stilleri koru |
-| **Bug duzeltme** | "bug", "calismıyor", "hata" | Sistematik debug, root cause bul |
-| **Refactor** | "refactor", "temizle", "iyilestir" | Davranisi koru, yapiyi duzelt |
-| **Ozellik ekleme** | "ekle", "yeni", "istiyorum" | Mevcut mimariyle uyumlu ekle |
-| **Spec dosyasi** | .md dosyasi verilmis | Dosyadaki tum maddeleri uygula |
-| **Devam** | .afn/STATE.md mevcut | Kaldigindan devam et |
+| Class | Detection | Behavior |
+|-------|-----------|----------|
+| **Greenfield** | Empty dir or new name | Full research + design + implement |
+| **Add to existing** | package.json etc. exists | Respect existing stack, preserve styles |
+| **Bug fix** | "bug", "broken", "not working" | Systematic debug, find root cause |
+| **Refactor** | "refactor", "clean up", "improve" | Preserve behavior, fix structure |
+| **Feature addition** | "add", "new", "I want" | Compatible with existing architecture |
+| **Spec file** | .md file provided | Implement all items from file |
+| **Resume** | .afn/STATE.md exists | Continue from where left off |
 
-## FAZ 1: ARASTIR (Proje tipine gore uyarlanir)
+## PHASE 1: RESEARCH (Adapts to project type)
 
-Agent tool ile PARALEL arastir. Sonuclari `.afn/RESEARCH.md`'ye yaz.
+Use Agent tool for PARALLEL research. Write findings to `.afn/RESEARCH.md`.
 
-**Sifirdan proje (4 agent):**
+**Greenfield project (4 agents):**
 
-| Agent | Gorev |
-|-------|-------|
-| Domain | Bu tur projeler nasil yapilir? Referanslar, standartlar (WebSearch) |
-| Teknik | En uygun tech stack, kutuphaneler, API'ler (context7 ile guncel docs) |
-| UX/Tasarim | Kullanici beklentileri, layout kaliplari, gorsel dil, renk, tipografi |
-| Altyapi | SEO, performans, guvenlik, erisilebilirlik, test stratejisi |
+| Agent | Task |
+|-------|------|
+| Domain | How are these projects built? References, standards (WebSearch) |
+| Technical | Best tech stack, libraries, APIs (context7 for current docs) |
+| UX/Design | User expectations, layout patterns, visual language, color, typography |
+| Infrastructure | SEO, performance, security, accessibility, test strategy |
 
-**Mevcut projeye ekleme (2 agent):**
+**Adding to existing project (2 agents):**
 
-| Agent | Gorev |
-|-------|-------|
-| Codebase | Mevcut mimari, stiller, konvansiyonlar (Explore agent) |
-| Teknik | Gerekli kutuphane/API, mevcut stack uyumlulugu |
+| Agent | Task |
+|-------|------|
+| Codebase | Existing architecture, styles, conventions (Explore agent) |
+| Technical | Required libraries/APIs, stack compatibility |
 
-**Bug duzeltme (1-2 agent):**
+**Bug fix (1-2 agents):**
 
-| Agent | Gorev |
-|-------|-------|
-| Debug | Hata mesajlari, loglar, root cause arastirmasi |
-| Codebase | Ilgili kod parcalari, data flow (Explore agent) |
+| Agent | Task |
+|-------|------|
+| Debug | Error messages, logs, root cause analysis |
+| Codebase | Related code sections, data flow (Explore agent) |
 
-**CLI/Backend/Script (2 agent):**
+**CLI/Backend/Script (2 agents):**
 
-| Agent | Gorev |
-|-------|-------|
-| Domain | Benzer araclar, best practices, UX kaliplari |
-| Teknik | Kutuphaneler, API'ler, performans, test stratejisi |
+| Agent | Task |
+|-------|------|
+| Domain | Similar tools, best practices, UX patterns |
+| Technical | Libraries, APIs, performance, test strategy |
 
-## FAZ 2: TASARLA
+## PHASE 2: DESIGN
 
-Sonuclari `.afn/DESIGN.md`'ye yaz. Proje tipine gore:
+Write results to `.afn/DESIGN.md`. Adapts to project type:
 
-**Sifirdan proje:** Dizin yapisi, sayfa listesi, komponent hiyerarsisi, DB semasi, API endpoint'leri, renk paleti, font, spacing, animasyon kurallari, responsive strateji
+**Greenfield:** Directory structure, page/screen list, component hierarchy, DB schema, API endpoints, color palette, fonts, spacing, animation rules, responsive strategy
 
-**Mevcut projeye ekleme:** Mevcut yapiyla uyumlu mimari, etkilenen dosyalar, stil uyumu
+**Adding to existing:** Architecture compatible with current structure, affected files, style conformance
 
-**Bug duzeltme:** Root cause analizi, fix stratejisi, regression test plani
+**Bug fix:** Root cause analysis, fix strategy, regression test plan
 
-**Refactor:** Mevcut davranis haritasi, hedef yapi, gecis plani
+**Refactor:** Current behavior map, target structure, step-by-step migration plan
 
-## FAZ 3: PLANLA
+## PHASE 3: PLAN
 
-- Tasarimi somut gorevlere bol
-- `.afn/STATE.md` olustur — gorev listesi ile
-- TodoWrite ile her gorevi kaydet
-- Bagimlilik sirasi belirle, paralel yapilabilecekleri isaretle
-- Kullaniciya KISA plan goster (basliklar), hemen basla
+- Break design into concrete tasks
+- Create `.afn/STATE.md` with task list
+- Register each task with TodoWrite
+- Determine dependency order, mark parallelizable tasks
+- Show user SHORT plan (headings only), start immediately
 
-## FAZ 4: UYGULA DONGUSU
+## PHASE 4: IMPLEMENT LOOP
 
-Her gorev icin:
+For each task:
 
-**a) Hazirlik:** Bagimliliklari kur (SORMADAN), dizinleri olustur, config ayarla
+**a) Prepare:** Install dependencies (WITHOUT asking), create directories, configure
 
-**b) Uygula:** Kod yaz/duzenle, stil uygula, GERCEKCI icerik ekle, testleri yaz
+**b) Implement:** Write/edit code, apply styles, add REALISTIC content, write tests where needed
 
-**c) Dogrula:**
+**c) Verify:**
 
-| Proje tipi | Dogrulama |
-|------------|-----------|
-| Web/UI | build + lint + screenshot (cdp-screenshot varsa) |
-| API/Backend | build + lint + test + curl ile endpoint test |
-| CLI | build + ornek komut + cikti kontrol |
-| Script | calistir + cikti kontrol |
-| Bug fix | hatanin tekrarlanmadigini dogrula + regression test |
-| Refactor | tum testler gecmeli + davranis degismemeli |
+| Project type | Verification |
+|-------------|-------------|
+| Web/UI | build + lint + screenshot (if cdp-screenshot available) |
+| API/Backend | build + lint + test + curl endpoint test |
+| CLI | build + run sample command + check output |
+| Script | run + check output |
+| Bug fix | verify bug no longer reproduces + regression test |
+| Refactor | all existing tests must pass + behavior unchanged |
 
-**d) Isaretle:** TodoWrite "completed" + STATE.md guncelle + 1 satir status
+**d) Mark:** TodoWrite "completed" + update STATE.md + 1-line status
 
-## FAZ 5: FINAL TARAMA
+## PHASE 5: FINAL REVIEW
 
-**Her proje icin:**
-- Tum dosyalar gozden gecir — eksik, yanlis, unutulan?
-- Entegrasyon kontrolu — parcalar birlikte calisiyor mu?
-- Build/test basarili mi?
-- Gereksiz console.log, debug kodu, TODO yorumlari?
+**For all projects:**
+- Review all files — missing, wrong, forgotten?
+- Integration check — do parts work together?
+- Build/test passing?
+- Leftover console.log, debug code, TODO comments?
 
-**Web/UI ek:** Responsive, SEO (meta/OG/structured data/sitemap), favicon, 404, loading/error states, dark mode, erisilebilirlik, performans
+**Web/UI extras:** Responsive, SEO (meta/OG/structured data/sitemap), favicon, 404, loading/error states, dark mode, accessibility, performance
 
-**API/Backend ek:** Tum endpoint'ler, error handling (400/401/404/500), input validation, CORS
+**API/Backend extras:** All endpoints working, error handling (400/401/404/500), input validation, CORS
 
-**CLI ek:** --help, hatali input handling, exit code'lar
+**CLI extras:** --help output, bad input handling, exit codes
 
-Eksik varsa: geri don, duzelt, dogrula. FINAL TARAMA temiz cikana kadar tekrarla.
+If gaps found: go back, fix, verify. Repeat FINAL REVIEW until clean.
 
-## FAZ 6: TESLIM
+## PHASE 6: DELIVER
 
-- Yapilanlarin kisa ozeti
-- Dosya listesi (olusturulan + degistirilen)
-- Calistirma talimatlari
-- Bilinen kisitlamalar (varsa)
-- Gelecek iyilestirme onerileri (kisa)
-- STATE.md'yi "TAMAMLANDI" olarak guncelle
-- Git commit onerisi
+- Short summary of what was built
+- File list (created + modified)
+- How to run (commands)
+- Known limitations (if any)
+- Future improvement suggestions (short)
+- Update STATE.md to "COMPLETED"
+- Offer git commit
 
-## ORTAM KURALLARI
+## ENVIRONMENT RULES
 
-| Ortam | Kural |
-|-------|-------|
-| **WSL1** | Linux tarayici ACILMAZ. cdp-screenshot veya Windows Chrome kullan |
-| **Git repo** | Mevcut branch'te calis, sonda commit oner. Force push YAPMA |
-| **Mevcut proje** | Tech stack DEGISTIRME. Mevcut konvansiyonlara UY |
-| **Bos dizin** | git init + .gitignore ile basla |
-| **Memory** | Kullanici tercihlerini kontrol et, uy |
+| Environment | Rule |
+|-------------|------|
+| **WSL1** | Linux browser CANNOT open. Use cdp-screenshot or Windows Chrome |
+| **Git repo** | Work on current branch, suggest commit at end. NEVER force push |
+| **Existing project** | Do NOT change tech stack. Follow existing conventions |
+| **Empty dir** | Start with git init + .gitignore |
+| **Memory** | Check user preferences from memory, respect them |
 
-## KENDIN KARAR VER — SORMA
+## DECIDE YOURSELF — DON'T ASK
 
-| Karar | Yaklasim |
-|-------|----------|
-| Tech stack | Proje amacina en uygun, modern, stabil |
-| Gorsel tasarim | Projenin ruhuna uygun, profesyonel, ozgun |
-| Renkler + Font | Amac uyumlu, okunabilir |
-| Icerik | Gercekci, anlamli (Lorem ipsum YASAK) |
-| Dosya yapisi | Olceklenebilir, temiz, standart |
-| Test stratejisi | Kritik is mantigi = test yaz. Trivial = yazma |
-| Bagimliliklar | Gerekeni kur, sormadan |
-| Eksik ozellikler | 404, favicon, loading, error states, README — gerekeni ekle |
+| Decision | Approach |
+|----------|----------|
+| Tech stack | Best fit for project purpose, modern, stable |
+| Visual design | Matches project spirit, professional, unique |
+| Colors + Fonts | Purpose-aligned, readable |
+| Content | Realistic, meaningful (Lorem ipsum BANNED) |
+| File structure | Scalable, clean, standard |
+| Test strategy | Write tests for critical business logic. Skip for trivial code |
+| Dependencies | Install what's needed, don't ask |
+| Missing features | 404, favicon, loading, error states, README — add what's needed |
 
-## KURALLAR
+## RULES
 
-1. **DURMA YASAGI:** Tum isler bitmeden ASLA "bitti" deme. Bahane GECERSIZ.
-2. **SORU MINIMIZASYONU:** Sadece KRITIK belirsizliklerde sor. Geri kalani kendin karar ver.
-3. **DOGRULAMA ZORUNLU:** Her gorev sonrasi dogrula. Dogrulamasiz gecis YOK.
-4. **SESSIZ CALISMA:** 1 satir status, devam et. Roman yazma.
-5. **HATA TOLERANSI:** 3 basarisiz deneme → kullaniciya sor. Sessizce atlama.
-6. **ATOMIK ILERLEME:** Her gorev bittikce isaretle + STATE.md guncelle.
-7. **PARALEL CALISMA:** Bagimsiz isler icin Agent tool kullan.
-8. **GERCEKCI ICERIK:** Lorem ipsum, TODO, placeholder, coming soon YASAK.
-9. **PROFESYONEL KALITE:** AI yapti belli olmamali.
-10. **EKSIK DUSUNME:** Kullanicinin aklina gelmeyen gerekli seyleri ekle.
-11. **MEVCUT KODA SAYGI:** Mevcut stil/stack/konvansiyona uy.
-12. **BAGIMLILIK YONETIMI:** Paketleri SORMADAN kur.
-13. **STATE PERSIST:** Her adimda .afn/STATE.md guncelle. Context olurse devam edilebilmeli.
-14. **DONGU KARARLILIGI:** Context siniri yaklastiginda STATE.md'yi son kez guncelle. `afn-loop.sh` otomatik yeni context acar — kullanicinin bir sey yapmasina gerek yok.
-15. **TEMIZ CIKIS:** Isler bitmeden context kapanacaksa, STATE.md'de "Son Durum" kismini net yaz ki yeni context tam nereden devam edecegini bilsin. Yarim kalmis dosyalari, partial kodu belirt.
+1. **NO STOPPING:** NEVER say "done" until ALL tasks complete. Excuses INVALID.
+2. **MINIMIZE QUESTIONS:** Only ask for CRITICAL ambiguities (e.g., "need paid API key, do you have one?"). Decide everything else yourself.
+3. **VERIFY MANDATORY:** Verify after every task. No skipping verification. EVER.
+4. **WORK SILENTLY:** 1-line status, move on. Don't write novels.
+5. **ERROR TOLERANCE:** 3 failed attempts → ask user. Never silently skip.
+6. **ATOMIC PROGRESS:** Mark each task as done + update STATE.md immediately.
+7. **PARALLEL WORK:** Use Agent tool for independent tasks.
+8. **REALISTIC CONTENT:** Lorem ipsum, TODO, placeholder, coming soon BANNED.
+9. **PROFESSIONAL QUALITY:** Must not look AI-generated.
+10. **THINK AHEAD:** Add things user didn't mention but are necessary.
+11. **RESPECT EXISTING CODE:** In existing projects = follow existing style/stack/conventions.
+12. **DEPENDENCY MANAGEMENT:** Install packages WITHOUT asking.
+13. **PERSIST STATE:** Update .afn/STATE.md after every step. Must be resumable if context resets.
+14. **LOOP STABILITY:** When context limit approaches, do a final STATE.md update. The `afn-loop.sh` script automatically opens a new context — user doesn't need to do anything.
+15. **CLEAN EXIT:** If context is ending mid-work, write clear "Last Status" in STATE.md so next context knows exactly where to resume. Note any partial files.
 
-## CONTEXT GECIS PROTOKOLU
+## CONTEXT TRANSITION PROTOCOL
 
-Context dolmaya yaklastiginda (veya `afn-loop.sh` ile calisiyorsan her context sonunda):
+When context is filling up (or when running via `afn-loop.sh`, at end of each context):
 
-1. Mevcut gorevi MUMKUNSE tamamla (yarim birakma)
-2. STATE.md'yi guncelle:
-   - Tamamlanan gorevleri [x] isaretle
-   - "Son Durum" kismina: tam olarak ne yapildi, ne yarim kaldi
-   - "Siradaki" kismina: bir sonraki adim ne
-3. Yarim kalan dosya varsa belirt (path + ne eksik)
-4. SESSIZCE cik — kullaniciya uzun veda mesaji yazma
+1. FINISH current task if possible (don't leave half-done)
+2. Update STATE.md:
+   - Mark completed tasks [x]
+   - "Last Status": exactly what was done, what's half-finished
+   - "Next": what the next step is
+3. Note any partial files (path + what's missing)
+4. Exit SILENTLY — no long goodbye messages
 
-Yeni context basladiginda:
-1. `.afn/STATE.md` oku
-2. `.afn/DESIGN.md` oku
-3. Yarim kalan dosyalari kontrol et
-4. 1 satir status ver, HEMEN devam et
+When new context starts:
+1. Read `.afn/STATE.md`
+2. Read `.afn/DESIGN.md`
+3. Check partial files
+4. 1-line status, IMMEDIATELY continue
