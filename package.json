@@ -1,0 +1,9 @@
+{
+  "name": "afn-autonomous-agent",
+  "version": "1.0.0",
+  "description": "AFN - Autonomous Full Intelligence skill for Claude Code. Fully autonomous development agent that researches, designs, plans, implements, and verifies any project from a single sentence.",
+  "keywords": ["claude-code", "skill", "autonomous", "agent", "ralph-loop", "development"],
+  "author": "afn7",
+  "license": "MIT"
+}
+
