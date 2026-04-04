@@ -62,6 +62,15 @@ while [[ $# -gt 0 ]]; do
 done
 TASK="${TASK_ARGS[*]}"
 
+# Check if agent explicitly shipped the project
+# Only triggers on "## Status: SHIPPED" — agent decides when truly done
+is_shipped() {
+  if [ -f "$STATE_FILE" ]; then
+    grep -q "^## Status: SHIPPED" "$STATE_FILE" && return 0
+  fi
+  return 1
+}
+
 # Check for pending tasks
 has_pending() {
   if [ -f "$STATE_FILE" ]; then
@@ -163,6 +172,16 @@ while true; do
 
   # All subsequent iterations use resume mode
   USER_PROMPT="Resume mode: Read .afn/STATE.md and .afn/DESIGN.md, continue from where you left off. Do not ask questions, just work. IMPORTANT: Always keep at least one pending - [ ] task. When tasks run out, add polish/improvement tasks. NEVER signal that the project is finished."
+
+  # Check if agent explicitly shipped the project
+  if is_shipped; then
+    echo ""
+    success "========================================="
+    success "  ${BOLD}PROJECT SHIPPED!${NC} ${GREEN}($ITERATION iterations)${NC}"
+    success "========================================="
+    show_progress
+    exit 0
+  fi
 
   # Check if there are still pending tasks
   if ! has_pending && [ -f "$STATE_FILE" ]; then

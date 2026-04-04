@@ -321,15 +321,23 @@ Quality audit always reveals improvements. Add them as new tasks:
 
 This keeps the loop running and the quality improving.
 
-## PHASE 6: DELIVER (single session only)
+## PHASE 6: SHIP
 
-Only when running inside Claude Code (not loop mode):
-- Short summary of what was built
-- File list (created + modified)
-- How to run
-- Offer git commit
+When the project is TRULY complete — all features built, audited, polished, tested:
 
-In loop mode: NEVER deliver. Always add more tasks and keep improving.
+1. Do one FINAL quality audit
+2. Summary: what was built, files, how to run
+3. Offer git commit
+4. Add this EXACT line to STATE.md:
+   ```
+   ## Status: SHIPPED
+   ```
+   This tells the loop to stop. Only write this when the project is genuinely finished.
+
+**When to SHIP vs when to KEEP GOING:**
+- Finite project ("build a website", "fix this bug") → ship when done
+- Open-ended project ("improve this indicator", "optimize performance") → never ship, keep iterating
+- If unsure → keep going. Shipping too early is worse than shipping too late.
 
 ## ENVIRONMENT RULES
 
