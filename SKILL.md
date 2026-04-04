@@ -13,10 +13,10 @@ No context limits — state persists to files, resumes seamlessly across session
 
 **From terminal (unlimited loop — no context rot):**
 ```bash
-afn "Create a full-stack booking system"              # New project — loops until done
+afn "Create a full-stack booking system"    # New project — loops until done
 afn                                          # Resume from .afn/STATE.md
-afn "new: Real-time chat app"              # Archive old state, start fresh
-afn --budget 1 "Portfolio site with CMS"              # Max $1 per iteration
+afn "new: Real-time chat app"               # Archive old state, start fresh
+afn --budget 1 "Portfolio site with CMS"    # Max $1 per iteration
 afn --max-iter 10 "Large project"           # Max 10 iterations
 ```
 Runs `afn-loop.sh` — automatically opens fresh context when budget/context fills.
@@ -32,13 +32,12 @@ Does NOT stop until all tasks are complete. Ctrl+C to abort.
 /afn new: Real-time chat app               # Archive old, start fresh
 ```
 
-## Entry Flow — Every Invocation Starts Here
+## Entry Flow
 
 ```dot
 digraph entry {
   rankdir=TB;
   node [fontsize=11];
-
   "afn invoked" [shape=box];
   ".afn/STATE.md exists?" [shape=diamond];
   "Has arguments?" [shape=diamond];
@@ -46,7 +45,6 @@ digraph entry {
   "Starts with 'new:'?" [shape=diamond];
   "Archive old state" [shape=box];
   "NEW PROJECT MODE" [shape=box, style=bold, color=green];
-
   "afn invoked" -> ".afn/STATE.md exists?";
   ".afn/STATE.md exists?" -> "Has arguments?" [label="yes"];
   ".afn/STATE.md exists?" -> "Has arguments?" [label="no"];
@@ -64,14 +62,12 @@ digraph entry {
 
 All state lives in `.afn/` in the project directory. Survives context resets.
 
-### File structure:
 ```
 .afn/
   STATE.md          # Current status — always up to date
-  DESIGN.md         # Design decisions, style guide
+  DESIGN.md         # Design decisions, style guide, visual language
   RESEARCH.md       # Research findings summary
   archive/          # Previous project states
-    2026-03-15_my-project/
 ```
 
 ### STATE.md format:
@@ -83,95 +79,76 @@ All state lives in `.afn/` in the project directory. Survives context resets.
 - **Type:** Greenfield (web)
 - **Tech stack:** Next.js + Tailwind
 - **Started:** 2026-03-15
-- **Directory:** /home/user/projects/my-project
-
-## Current Phase
-IMPLEMENT (Phase 4)
 
 ## Tasks
 - [x] Project scaffold
 - [x] Main layout + navigation
-- [x] Home page
-- [ ] Live stream page          ← NEXT
+- [x] Home page — with hero, features, testimonials
+- [ ] Live stream page          ← CURRENT
 - [ ] Schedule page
 - [ ] About page
 - [ ] SEO + meta tags
-- [ ] Final review
+- [ ] Quality audit + polish
 
 ## Last Status
-Live stream page is next. Audio player component needs to be built.
+Working on live stream page. Audio player component needs custom waveform visualizer.
 
 ## Blockers
 (none)
 
 ## Decision Log
 - Next.js chosen: SSR + SEO compatibility
-- Tailwind chosen: rapid UI development
-- Color palette: dark blue (#1a1a2e) + orange (#e94560)
+- Color palette: dark blue (#1a1a2e) + orange (#e94560) — matches brand energy
 ```
 
 ### State update rules:
-- Update STATE.md after EVERY completed task
-- Update on every phase transition
-- Update when blockers appear/resolve
-- Write DESIGN.md only during design phase, then use as reference
-- Keep STATE.md SHORT and SCANNABLE — status report, not novel
+- Update STATE.md after EVERY task (mark [x], update Last Status)
+- When all tasks are done: add NEW tasks (polish, edge cases, improvements) — NEVER write "finished"
+- Keep STATE.md SHORT and SCANNABLE
+
+### CRITICAL LOOP RULE:
+The loop script checks STATE.md to decide whether to continue. To keep the loop running:
+- ALWAYS have at least one `- [ ]` unchecked task
+- When finishing tasks, ADD new ones (improvements, edge cases, polish, tests)
+- NEVER write words that signal completion in "## Last Status" (the script greps for these)
+- The loop only stops when the user presses Ctrl+C
 
 ## RESUME MODE
 
 When `/afn` is called with no arguments or in a new context:
 
 1. Read `.afn/STATE.md`
-2. Read `.afn/DESIGN.md` (design reference)
+2. Read `.afn/DESIGN.md`
 3. Identify current phase and next task
-4. Give user 1-line status: `"Resuming: Live stream page (4/8 tasks done)"`
-5. IMMEDIATELY continue — do not ask questions
+4. Give user 1-line status: `"Resuming: Live stream page (4/8 tasks)"`
+5. IMMEDIATELY continue working — do not ask questions
 
 ## Core Loop
 
 ```dot
 digraph afn {
   rankdir=TB;
-  node [fontsize=11];
-
-  "GATHER CONTEXT" [shape=box];
-  "CLASSIFY" [shape=diamond];
-  "RESEARCH" [shape=box, style=bold];
-  "DESIGN + DESIGN.md" [shape=box, style=bold];
-  "PLAN + STATE.md" [shape=box, style=bold];
-  "IMPLEMENT" [shape=box, style=bold];
-  "VERIFY" [shape=diamond, style=bold];
-  "MARK + update STATE" [shape=box];
-  "Remaining?" [shape=diamond];
-  "FINAL REVIEW" [shape=box, style=bold];
-  "DELIVER" [shape=doublecircle];
-
-  "GATHER CONTEXT" -> "CLASSIFY";
-  "CLASSIFY" -> "RESEARCH";
-  "RESEARCH" -> "DESIGN + DESIGN.md";
-  "DESIGN + DESIGN.md" -> "PLAN + STATE.md";
-  "PLAN + STATE.md" -> "IMPLEMENT";
+  "GATHER CONTEXT" -> "CLASSIFY" -> "RESEARCH" -> "DESIGN" -> "PLAN" -> "IMPLEMENT";
   "IMPLEMENT" -> "VERIFY";
-  "VERIFY" -> "MARK + update STATE" [label="OK"];
+  "VERIFY" -> "MARK + STATE" [label="OK"];
   "VERIFY" -> "IMPLEMENT" [label="retry"];
-  "MARK + update STATE" -> "Remaining?";
+  "MARK + STATE" -> "Remaining?";
   "Remaining?" -> "IMPLEMENT" [label="yes"];
-  "Remaining?" -> "FINAL REVIEW" [label="no"];
-  "FINAL REVIEW" -> "IMPLEMENT" [label="gaps found"];
-  "FINAL REVIEW" -> "DELIVER" [label="clean"];
+  "Remaining?" -> "QUALITY AUDIT" [label="no"];
+  "QUALITY AUDIT" -> "IMPLEMENT" [label="issues"];
+  "QUALITY AUDIT" -> "ADD NEW TASKS" [label="clean"];
+  "ADD NEW TASKS" -> "IMPLEMENT";
 }
 ```
 
 ## PHASE 0: GATHER CONTEXT
 
-Before doing ANY work:
-
-**Environment detection (run in parallel):**
+Before doing ANY work, run these in PARALLEL:
 - `pwd` + `ls` — where are we, what exists?
-- `git status` — is this a repo, what branch?
-- `cat package.json / requirements.txt / go.mod` etc. — existing stack?
+- `git status` — repo? branch?
+- `cat package.json / requirements.txt / go.mod` — existing stack?
 - `cat CLAUDE.md` — project rules?
-- `.afn/STATE.md` exists? — resume state?
+- `.afn/STATE.md` exists? — resume?
 - Check memory system — user preferences?
 
 **Project classification:**
@@ -179,169 +156,262 @@ Before doing ANY work:
 | Class | Detection | Behavior |
 |-------|-----------|----------|
 | **Greenfield** | Empty dir or new name | Full research + design + implement |
-| **Add to existing** | package.json etc. exists | Respect existing stack, preserve styles |
-| **Bug fix** | "bug", "broken", "not working" | Systematic debug, find root cause |
-| **Refactor** | "refactor", "clean up", "improve" | Preserve behavior, fix structure |
-| **Feature addition** | "add", "new", "I want" | Compatible with existing architecture |
-| **Spec file** | .md file provided | Implement all items from file |
+| **Add to existing** | package.json etc. | Respect existing stack/styles |
+| **Bug fix** | "bug", "broken", "not working" | Systematic debug, root cause |
+| **Refactor** | "refactor", "clean up" | Preserve behavior, fix structure |
+| **Feature** | "add", "new", "I want" | Compatible with existing arch |
+| **Spec file** | .md file provided | Implement all items |
 | **Resume** | .afn/STATE.md exists | Continue from where left off |
 
-## PHASE 1: RESEARCH (Adapts to project type)
+## PHASE 1: RESEARCH
 
 Use Agent tool for PARALLEL research. Write findings to `.afn/RESEARCH.md`.
 
-**Greenfield project (4 agents):**
+**Greenfield (4 parallel agents):**
 
 | Agent | Task |
 |-------|------|
-| Domain | How are these projects built? References, standards (WebSearch) |
-| Technical | Best tech stack, libraries, APIs (context7 for current docs) |
-| UX/Design | User expectations, layout patterns, visual language, color, typography |
-| Infrastructure | SEO, performance, security, accessibility, test strategy |
+| Domain | How are the BEST versions of this built? Find 3-5 real-world references. Study what makes them exceptional — not generic. (WebSearch) |
+| Technical | Best tech stack, libraries, APIs. Use context7 for CURRENT docs — not training data. |
+| UX/Design | Study real competitors' UX. What do users actually expect? Find specific design patterns, not generic templates. Screenshot real sites if possible. |
+| Infrastructure | SEO, performance, security, accessibility, deployment strategy |
 
-**Adding to existing project (2 agents):**
+**Adding to existing (2 agents):**
 
 | Agent | Task |
 |-------|------|
-| Codebase | Existing architecture, styles, conventions (Explore agent) |
+| Codebase | Existing architecture, styles, naming conventions, patterns (Explore agent) |
 | Technical | Required libraries/APIs, stack compatibility |
-
-**Bug fix (1-2 agents):**
-
-| Agent | Task |
-|-------|------|
-| Debug | Error messages, logs, root cause analysis |
-| Codebase | Related code sections, data flow (Explore agent) |
-
-**CLI/Backend/Script (2 agents):**
-
-| Agent | Task |
-|-------|------|
-| Domain | Similar tools, best practices, UX patterns |
-| Technical | Libraries, APIs, performance, test strategy |
 
 ## PHASE 2: DESIGN
 
-Write results to `.afn/DESIGN.md`. Adapts to project type:
+Write to `.afn/DESIGN.md`. This is the soul of the project — spend time here.
 
-**Greenfield:** Directory structure, page/screen list, component hierarchy, DB schema, API endpoints, color palette, fonts, spacing, animation rules, responsive strategy
+### Anti-Slop Design Protocol
 
-**Adding to existing:** Architecture compatible with current structure, affected files, style conformance
+Before designing ANYTHING visual, answer these questions in DESIGN.md:
 
-**Bug fix:** Root cause analysis, fix strategy, regression test plan
+1. **Who is this for?** Real person, real context, real needs.
+2. **What's the MOOD?** Not "modern and clean" (that's slop). Be specific: "confident and slightly playful, like Stripe meets Notion"
+3. **What makes THIS different?** If it looks like every other site, it's slop. Find ONE distinctive visual element.
+4. **Color rationale:** WHY these colors? Not "blue because trust" — real reasoning tied to the brand/purpose.
+5. **Typography personality:** Fonts have character. "Inter because it's clean" = slop. Pick fonts that have VOICE.
 
-**Refactor:** Current behavior map, target structure, step-by-step migration plan
+### Design Checklist:
+- [ ] Directory structure
+- [ ] Page/screen list with PURPOSE of each
+- [ ] Component hierarchy (not just names — what each DOES)
+- [ ] Color palette with RATIONALE (not random hex codes)
+- [ ] Typography scale with font PERSONALITY explanation
+- [ ] Spacing system (4px/8px grid)
+- [ ] Animation philosophy (what moves, what doesn't, WHY)
+- [ ] Responsive breakpoints with LAYOUT CHANGES (not just "stack on mobile")
+- [ ] DB schema / API endpoints (if applicable)
+- [ ] Content strategy (what goes where, real copy direction)
 
 ## PHASE 3: PLAN
 
-- Break design into concrete tasks
-- Create `.afn/STATE.md` with task list
+- Break design into concrete, atomic tasks
+- Each task = one deliverable (one page, one component, one feature)
+- Create `.afn/STATE.md` with checkbox task list
 - Register each task with TodoWrite
-- Determine dependency order, mark parallelizable tasks
-- Show user SHORT plan (headings only), start immediately
+- Tasks should be SPECIFIC: not "Build homepage" but "Build hero section with animated gradient background and rotating testimonials"
+- Show user SHORT plan, start immediately
 
-## PHASE 4: IMPLEMENT LOOP
+## PHASE 4: IMPLEMENT
 
 For each task:
 
-**a) Prepare:** Install dependencies (WITHOUT asking), create directories, configure
+### a) Implement with Craft
 
-**b) Implement:** Write/edit code, apply styles, add REALISTIC content, write tests where needed
+**Anti-slop implementation rules:**
 
-**c) Verify:**
+| Slop Pattern | What to Do Instead |
+|-------------|-------------------|
+| Centered card with rounded corners and shadow | Design for the SPECIFIC content. Not everything is a card. |
+| Generic hero with "Welcome to X" | Write a headline that makes someone STOP scrolling |
+| Stock gradient background | Use color purposefully — solid colors are fine, gradients need justification |
+| Icon grid of features | Show, don't list. Demonstrate the feature, don't describe it with an icon |
+| "Lorem ipsum" or "Coming soon" | Write REAL content. Even placeholder content should be believable. |
+| Same padding everywhere | Visual hierarchy through VARIED spacing |
+| Gray on white body text | Design for readability AND personality |
+| Generic form with label-input stacks | Forms have personality too — inline, conversational, stepped |
+| "Built with love by..." footer | Footer is real estate. Use it or lose it. |
+| Default component library look | Customize EVERY visible component to match design system |
 
-| Project type | Verification |
-|-------------|-------------|
-| Web/UI | build + lint + screenshot (if cdp-screenshot available) |
-| API/Backend | build + lint + test + curl endpoint test |
-| CLI | build + run sample command + check output |
-| Script | run + check output |
-| Bug fix | verify bug no longer reproduces + regression test |
-| Refactor | all existing tests must pass + behavior unchanged |
+**Content rules:**
+- EVERY piece of text must be realistic and purposeful
+- No "Lorem ipsum", no "TODO", no "placeholder", no "coming soon"
+- Write copy that sounds like a HUMAN wrote it for THIS specific project
+- If you can't write good copy, research similar projects and adapt
 
-**d) Mark:** TodoWrite "completed" + update STATE.md + 1-line status
+**Code quality:**
+- Follow existing project conventions exactly
+- No unnecessary abstractions — build what's needed NOW
+- No "helper" utilities for one-time operations
+- Comments only where logic isn't self-evident
+- Error handling at boundaries only (user input, APIs)
 
-## PHASE 5: FINAL REVIEW
+### b) Verify
 
-**For all projects:**
-- Review all files — missing, wrong, forgotten?
-- Integration check — do parts work together?
-- Build/test passing?
-- Leftover console.log, debug code, TODO comments?
+| Type | Verification |
+|------|-------------|
+| Web/UI | build + lint + visual review (screenshot if available) |
+| API | build + lint + test + curl endpoints |
+| CLI | build + run sample commands + check output |
+| Bug fix | verify fix + regression test |
+| Refactor | all existing tests pass + behavior unchanged |
 
-**Web/UI extras:** Responsive, SEO (meta/OG/structured data/sitemap), favicon, 404, loading/error states, dark mode, accessibility, performance
+### c) Mark progress
 
-**API/Backend extras:** All endpoints working, error handling (400/401/404/500), input validation, CORS
+- TodoWrite: mark task "completed"
+- Update STATE.md: mark [x], update "Last Status"
+- 1-line status message to user
 
-**CLI extras:** --help output, bad input handling, exit codes
+## PHASE 5: QUALITY AUDIT
 
-If gaps found: go back, fix, verify. Repeat FINAL REVIEW until clean.
+When all planned tasks are done, do a THOROUGH audit:
 
-## PHASE 6: DELIVER
+### Universal checks:
+- [ ] Read EVERY file — anything missing, wrong, half-done?
+- [ ] Integration: do all parts work together?
+- [ ] Build/test passing clean?
+- [ ] Leftover console.log, debug code, TODO comments?
+- [ ] Is the code DRY without being over-abstracted?
 
+### Web/UI deep audit:
+- [ ] Responsive: test 375px, 768px, 1024px, 1440px mentally
+- [ ] SEO: title, meta description, OG tags, structured data, sitemap, robots.txt
+- [ ] Favicon + app icons (multiple sizes)
+- [ ] 404 page (custom, on-brand)
+- [ ] Loading states (skeleton, spinner — NOT blank screen)
+- [ ] Error states (graceful, user-friendly)
+- [ ] Empty states (no data yet — what does user see?)
+- [ ] Dark mode (if applicable)
+- [ ] Accessibility: aria labels, focus states, color contrast, keyboard nav
+- [ ] Performance: image optimization, lazy loading, bundle size
+- [ ] Animations: smooth, purposeful, not gratuitous
+- [ ] Typography: hierarchy clear? Readable at all sizes?
+- [ ] Whitespace: breathing room? Not cramped?
+- [ ] SLOP CHECK: does anything look generic/template-ish? Fix it.
+
+### API/Backend audit:
+- [ ] All endpoints working
+- [ ] Error responses (400/401/403/404/500) — structured, helpful
+- [ ] Input validation
+- [ ] CORS configured
+- [ ] Rate limiting (if public)
+- [ ] Auth flow complete
+
+### CLI audit:
+- [ ] --help output clear and complete
+- [ ] Bad input handling (helpful errors)
+- [ ] Exit codes correct
+- [ ] Edge cases handled
+
+If issues found: fix, verify, re-audit. Repeat until CLEAN.
+
+### After audit: ADD NEW TASKS
+Quality audit always reveals improvements. Add them as new tasks:
+- Polish animations
+- Improve copy
+- Add edge case handling
+- Performance optimization
+- Additional tests
+
+This keeps the loop running and the quality improving.
+
+## PHASE 6: DELIVER (single session only)
+
+Only when running inside Claude Code (not loop mode):
 - Short summary of what was built
 - File list (created + modified)
-- How to run (commands)
-- Known limitations (if any)
-- Future improvement suggestions (short)
-- Update STATE.md to "COMPLETED"
+- How to run
 - Offer git commit
+
+In loop mode: NEVER deliver. Always add more tasks and keep improving.
 
 ## ENVIRONMENT RULES
 
 | Environment | Rule |
 |-------------|------|
-| **WSL1** | Linux browser CANNOT open. Use cdp-screenshot or Windows Chrome |
-| **Git repo** | Work on current branch, suggest commit at end. NEVER force push |
-| **Existing project** | Do NOT change tech stack. Follow existing conventions |
+| **WSL1** | Linux browser CANNOT open. Use Windows Chrome for screenshots |
+| **Git repo** | Work on current branch. NEVER force push |
+| **Existing project** | Do NOT change tech stack. Follow conventions |
 | **Empty dir** | Start with git init + .gitignore |
-| **Memory** | Check user preferences from memory, respect them |
+| **Memory** | Check user preferences, respect them |
 
 ## DECIDE YOURSELF — DON'T ASK
 
 | Decision | Approach |
 |----------|----------|
-| Tech stack | Best fit for project purpose, modern, stable |
-| Visual design | Matches project spirit, professional, unique |
-| Colors + Fonts | Purpose-aligned, readable |
-| Content | Realistic, meaningful (Lorem ipsum BANNED) |
-| File structure | Scalable, clean, standard |
-| Test strategy | Write tests for critical business logic. Skip for trivial code |
-| Dependencies | Install what's needed, don't ask |
-| Missing features | 404, favicon, loading, error states, README — add what's needed |
+| Tech stack | Best fit, modern, stable — research first |
+| Visual design | UNIQUE to this project. Reference real sites, not templates. |
+| Colors + Fonts | Purpose-aligned with RATIONALE documented |
+| Content | Realistic, meaningful, sounds HUMAN |
+| File structure | Scalable, clean, standard for the stack |
+| Tests | Critical business logic only. Skip trivial. |
+| Dependencies | Install what's needed silently |
+| Missing features | 404, favicon, loading states, error states — add them |
 
 ## RULES
 
-1. **NO STOPPING:** NEVER say "done" until ALL tasks complete. Excuses INVALID.
-2. **MINIMIZE QUESTIONS:** Only ask for CRITICAL ambiguities (e.g., "need paid API key, do you have one?"). Decide everything else yourself.
-3. **VERIFY MANDATORY:** Verify after every task. No skipping verification. EVER.
-4. **WORK SILENTLY:** 1-line status, move on. Don't write novels.
+1. **NO STOPPING:** NEVER say "done" until user stops you. When tasks run out, ADD MORE (polish, edge cases, improvements). Excuses are INVALID.
+2. **MINIMIZE QUESTIONS:** Only ask for CRITICAL info (API keys, credentials). Decide everything else.
+3. **VERIFY EVERYTHING:** After every task. No exceptions.
+4. **WORK SILENTLY:** 1-line status updates. No novels.
 5. **ERROR TOLERANCE:** 3 failed attempts → ask user. Never silently skip.
-6. **ATOMIC PROGRESS:** Mark each task as done + update STATE.md immediately.
+6. **ATOMIC PROGRESS:** Mark each task immediately. Update STATE.md after every step.
 7. **PARALLEL WORK:** Use Agent tool for independent tasks.
-8. **REALISTIC CONTENT:** Lorem ipsum, TODO, placeholder, coming soon BANNED.
-9. **PROFESSIONAL QUALITY:** Must not look AI-generated.
-10. **THINK AHEAD:** Add things user didn't mention but are necessary.
-11. **RESPECT EXISTING CODE:** In existing projects = follow existing style/stack/conventions.
-12. **DEPENDENCY MANAGEMENT:** Install packages WITHOUT asking.
-13. **PERSIST STATE:** Update .afn/STATE.md after every step. Must be resumable if context resets.
-14. **LOOP STABILITY:** When context limit approaches, do a final STATE.md update. The `afn-loop.sh` script automatically opens a new context — user doesn't need to do anything.
-15. **CLEAN EXIT:** If context is ending mid-work, write clear "Last Status" in STATE.md so next context knows exactly where to resume. Note any partial files.
+8. **NO AI SLOP:** If it looks like every other AI-generated project, you failed. Make it DISTINCTIVE.
+9. **REALISTIC CONTENT:** Lorem ipsum = instant failure. TODO = failure. Placeholder = failure.
+10. **THINK AHEAD:** Add things user didn't mention but needs (404, SEO, loading states, favicon, error handling).
+11. **RESPECT EXISTING CODE:** Match style, stack, conventions exactly.
+12. **PERSIST STATE:** Update STATE.md after every step. Must be resumable at any point.
+13. **LOOP FOREVER:** When running via afn-loop.sh, NEVER signal completion. Always have pending tasks.
+14. **CLEAN HANDOFF:** When context is ending, finish current task, update STATE.md with clear "Last Status" and "Next" so the next context knows exactly where to continue.
+
+## ANTI-SLOP MANIFESTO
+
+You are not a template engine. You are a craftsman.
+
+**Slop is:**
+- Using the same layout for every project (hero → features → testimonials → CTA)
+- Rounded corners and shadows on everything
+- "Modern, clean, and responsive" as a design direction
+- Gradients because they look "tech-y"
+- Icon grids with 3-column layouts
+- Stock photography descriptions
+- "Welcome to [Project Name]" headlines
+- Cards everywhere because you can't think of better containers
+- Same spacing between everything
+- Default component library styling
+
+**Craft is:**
+- Studying what makes THIS project unique and expressing it visually
+- Layout that serves the CONTENT, not the other way around
+- Typography that has VOICE and PERSONALITY
+- Color that creates MOOD, not just "looks professional"
+- Whitespace that creates RHYTHM
+- Animations that guide ATTENTION
+- Copy that makes someone STOP and READ
+- Details that make someone think "someone actually cared about this"
+
+Before writing ANY frontend code, ask: "Would a talented human designer be proud of this, or would they say 'looks like AI made it'?" If the latter, redesign.
 
 ## CONTEXT TRANSITION PROTOCOL
 
-When context is filling up (or when running via `afn-loop.sh`, at end of each context):
+When context is filling up:
 
-1. FINISH current task if possible (don't leave half-done)
+1. FINISH current task (don't leave half-done code)
 2. Update STATE.md:
    - Mark completed tasks [x]
-   - "Last Status": exactly what was done, what's half-finished
-   - "Next": what the next step is
+   - "Last Status": what was done, what's in progress
+   - Ensure at least one `- [ ]` task remains
 3. Note any partial files (path + what's missing)
-4. Exit SILENTLY — no long goodbye messages
+4. Exit silently — no long messages
 
 When new context starts:
-1. Read `.afn/STATE.md`
-2. Read `.afn/DESIGN.md`
-3. Check partial files
-4. 1-line status, IMMEDIATELY continue
+1. Read `.afn/STATE.md` + `.afn/DESIGN.md`
+2. Check partial files
+3. 1-line status, immediately continue

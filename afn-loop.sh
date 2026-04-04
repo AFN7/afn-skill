@@ -1,13 +1,13 @@
 #!/bin/bash
 # AFN Loop Runner — Unlimited autonomous loop
 # Starts a FRESH context each iteration. No compact/rot.
-# Does NOT stop until STATE.md says "COMPLETED".
+# Keeps running until user presses Ctrl+C.
 #
 # Usage:
-#   afn "Create a full-stack booking system"              # New project
+#   afn "Create a full-stack booking system"    # New project
 #   afn                                          # Resume (if STATE.md exists)
-#   afn "new: Real-time chat app"              # Start fresh
-#   afn --budget 1 "Portfolio site with CMS"              # Max $1 per iteration
+#   afn "new: Real-time chat app"               # Start fresh
+#   afn --budget 1 "Portfolio site with CMS"    # Max $1 per iteration
 #   afn --max-iter 10 "Large project"           # Max 10 iterations
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,7 +18,7 @@ if [ ! -f "$SKILL_FILE" ]; then
 fi
 AFN_DIR=".afn"
 STATE_FILE="$AFN_DIR/STATE.md"
-MAX_RETRIES=3
+MAX_RETRIES=10
 RETRY_COUNT=0
 BUDGET_PER_ITER=""
 MAX_ITERATIONS=0
@@ -62,20 +62,6 @@ while [[ $# -gt 0 ]]; do
 done
 TASK="${TASK_ARGS[*]}"
 
-# Check if project is completed
-is_done() {
-  if [ -f "$STATE_FILE" ]; then
-    # Only check "## Last Status" section for completion markers
-    # Avoids false positives from rules/docs mentioning these words
-    sed -n '/^## Last Status/,/^##/p' "$STATE_FILE" 2>/dev/null | grep -qi "ALL.*FINISH\|PROJECT.*FINISH\|PROJE.*BITT" && return 0
-    # Also check if there are ZERO pending tasks AND status says finished
-    if ! grep -q "\- \[ \]" "$STATE_FILE" 2>/dev/null; then
-      sed -n '/^## Last Status/,/^##/p' "$STATE_FILE" 2>/dev/null | grep -qi "tamamla\|bitir\|final\|finish" && return 0
-    fi
-  fi
-  return 1
-}
-
 # Check for pending tasks
 has_pending() {
   if [ -f "$STATE_FILE" ]; then
@@ -115,9 +101,9 @@ trap cleanup SIGINT SIGTERM
 build_prompt() {
   local prompt=""
   if [ -f "$STATE_FILE" ]; then
-    prompt="Resume mode: Read .afn/STATE.md and .afn/DESIGN.md, continue from where you left off. Do not ask questions, just work."
+    prompt="Resume mode: Read .afn/STATE.md and .afn/DESIGN.md, continue from where you left off. Do not ask questions, just work. Remember: ALWAYS keep at least one pending task in STATE.md. When tasks run out, add new improvement/polish tasks."
     if [ -n "$1" ]; then
-      prompt="$1 — Also check .afn/STATE.md if it exists."
+      prompt="$1 — Also check .afn/STATE.md if it exists. Remember: ALWAYS keep at least one pending task."
     fi
   else
     prompt="$1"
@@ -138,7 +124,7 @@ fi
 
 echo ""
 log "========================================="
-log "  ${BOLD}AFN Autonomous Loop Started${NC}"
+log "  ${BOLD}AFN Autonomous Loop${NC}"
 log "========================================="
 log "Task: ${TASK:-resume}"
 [ -n "$BUDGET_PER_ITER" ] && log "Budget/iteration: \$$BUDGET_PER_ITER"
@@ -164,9 +150,6 @@ while true; do
   log "-----------------------------------------"
 
   # Run Claude with FRESH context
-  # --append-system-prompt: injects SKILL.md as system prompt
-  # --print: non-interactive mode, single run
-  # --dangerously-skip-permissions: autonomous operation
   CMD=(claude --print --dangerously-skip-permissions)
   CMD+=(--append-system-prompt "$(cat "$SKILL_FILE")")
 
@@ -179,33 +162,20 @@ while true; do
   EXIT_CODE=$?
 
   # All subsequent iterations use resume mode
-  USER_PROMPT="Resume mode: Read .afn/STATE.md and .afn/DESIGN.md, continue from where you left off. Do not ask questions, just work."
+  USER_PROMPT="Resume mode: Read .afn/STATE.md and .afn/DESIGN.md, continue from where you left off. Do not ask questions, just work. IMPORTANT: Always keep at least one pending - [ ] task. When tasks run out, add polish/improvement tasks. NEVER signal that the project is finished."
 
-  # Completion check
-  if is_done; then
-    echo ""
-    success "========================================="
-    success "  ${BOLD}PROJECT COMPLETED!${NC} ${GREEN}($ITERATION iterations)${NC}"
-    success "========================================="
-    show_progress
-
-    if [ -f "$STATE_FILE" ]; then
-      echo ""
-      log "Final state:"
-      cat "$STATE_FILE"
-    fi
-    exit 0
-  fi
-
-  # Pending task check
+  # Check if there are still pending tasks
   if ! has_pending && [ -f "$STATE_FILE" ]; then
-    if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-      warn "State unclear after $MAX_RETRIES retries. Stopping."
-      show_progress
-      exit 1
-    fi
     RETRY_COUNT=$((RETRY_COUNT + 1))
-    warn "No pending tasks but not marked complete. Retrying ($RETRY_COUNT/$MAX_RETRIES)..."
+    if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+      warn "No pending tasks after $MAX_RETRIES iterations. The agent keeps completing all tasks."
+      warn "Restarting with explicit instructions to add new tasks..."
+      RETRY_COUNT=0
+      USER_PROMPT="Resume mode: Read .afn/STATE.md. ALL tasks are marked done but the project needs MORE WORK. Add at least 5 new tasks: polish, edge cases, performance, tests, improvements. Then work on them. NEVER run out of tasks."
+    else
+      warn "No pending tasks. Telling agent to add more... ($RETRY_COUNT/$MAX_RETRIES)"
+      USER_PROMPT="Resume mode: Read .afn/STATE.md. You ran out of tasks but the project is NOT finished. Add new improvement tasks (polish, edge cases, performance, tests, accessibility, content improvements) and continue working. Keep at least 3 pending tasks at all times."
+    fi
   else
     RETRY_COUNT=0
   fi
