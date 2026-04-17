@@ -1,14 +1,15 @@
 #!/bin/bash
 # AFN Loop Runner — Unlimited autonomous loop
 # Starts a FRESH context each iteration. No compact/rot.
-# Keeps running until user presses Ctrl+C.
+# Keeps running until: Status:SHIPPED | Status:PAUSED | --max-iter | Ctrl+C.
 #
 # Usage:
 #   afn "Create a full-stack booking system"    # New project
 #   afn                                          # Resume (if STATE.md exists)
-#   afn "new: Real-time chat app"               # Start fresh
+#   afn "new: Real-time chat app"               # Archive old, start fresh
 #   afn --budget 1 "Portfolio site with CMS"    # Max $1 per iteration
 #   afn --max-iter 10 "Large project"           # Max 10 iterations
+#   afn --fresh "Research mode"                 # Ignore existing state (no archive)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_FILE="$SCRIPT_DIR/skills/afn/SKILL.md"
@@ -18,23 +19,28 @@ if [ ! -f "$SKILL_FILE" ]; then
 fi
 AFN_DIR=".afn"
 STATE_FILE="$AFN_DIR/STATE.md"
-MAX_RETRIES=10
+LOG_FILE="$AFN_DIR/LOG.md"
+MAX_RETRIES=3
 RETRY_COUNT=0
 BUDGET_PER_ITER=""
 MAX_ITERATIONS=0
+FRESH=0
 
 # Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+DIM='\033[2m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-log() { echo -e "${CYAN}[AFN]${NC} $1"; }
+log()     { echo -e "${CYAN}[AFN]${NC} $1"; }
 success() { echo -e "${GREEN}[AFN]${NC} $1"; }
-warn() { echo -e "${YELLOW}[AFN]${NC} $1"; }
-error() { echo -e "${RED}[AFN]${NC} $1"; }
+warn()    { echo -e "${YELLOW}[AFN]${NC} $1"; }
+error()   { echo -e "${RED}[AFN]${NC} $1"; }
+info()    { echo -e "${MAGENTA}[AFN]${NC} $1"; }
 
 # Check skill file exists
 if [ ! -f "$SKILL_FILE" ]; then
@@ -46,50 +52,43 @@ fi
 TASK_ARGS=()
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --budget)
-      BUDGET_PER_ITER="$2"
-      shift 2
-      ;;
-    --max-iter)
-      MAX_ITERATIONS="$2"
-      shift 2
-      ;;
-    *)
-      TASK_ARGS+=("$1")
-      shift
-      ;;
+    --budget)     BUDGET_PER_ITER="$2"; shift 2 ;;
+    --max-iter)   MAX_ITERATIONS="$2"; shift 2 ;;
+    --fresh)      FRESH=1; shift ;;
+    *)            TASK_ARGS+=("$1"); shift ;;
   esac
 done
 TASK="${TASK_ARGS[*]}"
 
-# Check if agent explicitly shipped the project
-# Only triggers on "## Status: SHIPPED" — agent decides when truly done
+# --- Status signal checks ---
+
+# SHIPPED: agent declared project complete (success exit)
 is_shipped() {
-  if [ -f "$STATE_FILE" ]; then
-    grep -q "^## Status: SHIPPED" "$STATE_FILE" && return 0
-  fi
-  return 1
+  [ -f "$STATE_FILE" ] && grep -q "^## Status: SHIPPED" "$STATE_FILE"
 }
 
-# Check for pending tasks
+# PAUSED: agent wants user review (clean exit, not failure)
+is_paused() {
+  [ -f "$STATE_FILE" ] && grep -q "^## Status: PAUSED" "$STATE_FILE"
+}
+
+# Any pending `- [ ]` task remains
 has_pending() {
-  if [ -f "$STATE_FILE" ]; then
-    grep -q "\- \[ \]" "$STATE_FILE" && return 0
-  fi
-  return 1
+  [ -f "$STATE_FILE" ] && grep -q "^- \[ \]" "$STATE_FILE"
 }
 
-# Show progress bar
+# --- Observability ---
+
+# Print progress bar
 show_progress() {
   if [ -f "$STATE_FILE" ]; then
-    local total=0
-    local done=0
-    total=$(grep -c "\- \[.\]" "$STATE_FILE" 2>/dev/null) || true
-    done=$(grep -c "\- \[x\]" "$STATE_FILE" 2>/dev/null) || true
+    local total done pct bar filled i
+    total=$(grep -c "^- \[.\]" "$STATE_FILE" 2>/dev/null || echo 0)
+    done=$(grep -c "^- \[x\]" "$STATE_FILE" 2>/dev/null || echo 0)
     if [ "$total" -gt 0 ]; then
-      local pct=$((done * 100 / total))
-      local bar=""
-      local filled=$((pct / 5))
+      pct=$((done * 100 / total))
+      bar=""
+      filled=$((pct / 5))
       for ((i=0; i<filled; i++)); do bar+="█"; done
       for ((i=filled; i<20; i++)); do bar+="░"; done
       echo -e "${CYAN}[AFN]${NC} Progress: ${BOLD}[$bar] $pct%${NC} ($done/$total tasks)"
@@ -97,31 +96,84 @@ show_progress() {
   fi
 }
 
-# Ctrl+C handler — clean exit
+# Print the ## Current single-line status (what the agent is doing NOW)
+show_current() {
+  if [ -f "$STATE_FILE" ]; then
+    # Extract the first non-empty line after "## Current"
+    local current
+    current=$(awk '/^## Current$/{flag=1; next} /^## /{flag=0} flag && NF' "$STATE_FILE" | head -1)
+    if [ -n "$current" ]; then
+      echo -e "${CYAN}[AFN]${NC} ${DIM}Current:${NC} $current"
+    fi
+  fi
+}
+
+# Print the last LOG.md block — what happened in the last iteration
+show_last_log() {
+  if [ -f "$LOG_FILE" ]; then
+    # Print the last `## `-prefixed block (iteration entry)
+    local last_block
+    last_block=$(awk 'BEGIN{block=""} /^## /{block=""} {block=block"\n"$0} END{print block}' "$LOG_FILE" | sed '/^$/d')
+    if [ -n "$last_block" ]; then
+      echo -e "${DIM}──── Last iteration ────${NC}"
+      echo -e "${DIM}$last_block${NC}"
+      echo -e "${DIM}────────────────────────${NC}"
+    fi
+  fi
+}
+
+# Print tasks completed since last iteration (diff via git if possible, else diffless)
+show_task_snapshot() {
+  if [ -f "$STATE_FILE" ]; then
+    local done_tasks
+    done_tasks=$(grep "^- \[x\]" "$STATE_FILE" 2>/dev/null | tail -3)
+    if [ -n "$done_tasks" ]; then
+      echo -e "${DIM}Recently completed:${NC}"
+      echo "$done_tasks" | sed "s/^- \[x\]/${GREEN}✓${NC}/"
+    fi
+  fi
+}
+
+# --- Ctrl+C handler ---
 cleanup() {
   echo ""
   warn "Stopping... (STATE.md preserved)"
   show_progress
+  show_current
   exit 130
 }
 trap cleanup SIGINT SIGTERM
 
-# Build prompt based on state
+# --- Fresh mode: nuke state if requested ---
+if [ "$FRESH" -eq 1 ] && [ -f "$STATE_FILE" ]; then
+  warn "--fresh: discarding existing state (not archived)"
+  rm -f "$STATE_FILE" "$LOG_FILE"
+fi
+
+# --- Build initial prompt based on state ---
 build_prompt() {
-  local prompt=""
-  if [ -f "$STATE_FILE" ]; then
-    prompt="Resume mode: Read .afn/STATE.md and .afn/DESIGN.md, continue from where you left off. Do not ask questions, just work. Remember: ALWAYS keep at least one pending task in STATE.md. When tasks run out, add new improvement/polish tasks."
-    if [ -n "$1" ]; then
-      prompt="$1 — Also check .afn/STATE.md if it exists. Remember: ALWAYS keep at least one pending task."
-    fi
+  local user_task="$1"
+  if [ -f "$STATE_FILE" ] && [ -z "$user_task" ]; then
+    echo "Resume mode: Read .afn/STATE.md + .afn/DESIGN.md (if exists) + last 3 LOG.md entries. Continue from where you left off. Update ## Current on task start. Append LOG.md on iteration end. If stuck or ambiguous → Status: PAUSED with clear summary (don't silent-abort). IMPORTANT: Keep ≥1 unchecked - [ ] task. When tasks truly run out, follow Ship Decision phase: finite projects → SHIPPED; open-ended → add concrete polish tasks with clear done-criteria."
+  elif [ -f "$STATE_FILE" ] && [ -n "$user_task" ]; then
+    echo "$user_task — Also check .afn/STATE.md. Update ## Current on task start. IMPORTANT: Keep ≥1 pending task. Use Status: PAUSED for stuck/ambiguous/destructive."
   else
-    prompt="$1"
+    echo "$user_task"
   fi
-  echo "$prompt"
 }
 
-# First invocation
+# --- First invocation handling ---
 if [ -z "$TASK" ] && [ -f "$STATE_FILE" ]; then
+  # Stale state check (> 7 days)
+  if [ -f "$STATE_FILE" ]; then
+    # macOS vs Linux stat
+    MTIME=$(stat -c %Y "$STATE_FILE" 2>/dev/null || stat -f %m "$STATE_FILE" 2>/dev/null || echo 0)
+    NOW=$(date +%s)
+    AGE_DAYS=$(( (NOW - MTIME) / 86400 ))
+    if [ "$AGE_DAYS" -gt 7 ]; then
+      warn "State is ${AGE_DAYS} days old. Agent will surface review prompt before continuing."
+    fi
+  fi
   log "Existing state found. Resuming..."
   USER_PROMPT=$(build_prompt "")
 elif [ -z "$TASK" ] && [ ! -f "$STATE_FILE" ]; then
@@ -131,6 +183,7 @@ else
   USER_PROMPT=$(build_prompt "$TASK")
 fi
 
+# --- Banner ---
 echo ""
 log "========================================="
 log "  ${BOLD}AFN Autonomous Loop${NC}"
@@ -138,7 +191,7 @@ log "========================================="
 log "Task: ${TASK:-resume}"
 [ -n "$BUDGET_PER_ITER" ] && log "Budget/iteration: \$$BUDGET_PER_ITER"
 [ "$MAX_ITERATIONS" -gt 0 ] && log "Max iterations: $MAX_ITERATIONS"
-log "Press Ctrl+C to stop"
+log "Signals: ${GREEN}SHIPPED${NC}=done · ${YELLOW}PAUSED${NC}=review · Ctrl+C=stop"
 echo ""
 
 ITERATION=0
@@ -150,15 +203,18 @@ while true; do
   if [ "$MAX_ITERATIONS" -gt 0 ] && [ "$ITERATION" -gt "$MAX_ITERATIONS" ]; then
     warn "Max iterations reached ($MAX_ITERATIONS). Stopping."
     show_progress
+    show_current
     exit 0
   fi
 
   log "-----------------------------------------"
   log "Iteration ${BOLD}#$ITERATION${NC} starting..."
   show_progress
+  show_current
+  show_last_log
   log "-----------------------------------------"
 
-  # Run Claude with FRESH context
+  # --- Run Claude with FRESH context ---
   CMD=(claude --print --dangerously-skip-permissions)
   CMD+=(--append-system-prompt "$(cat "$SKILL_FILE")")
 
@@ -170,10 +226,34 @@ while true; do
 
   EXIT_CODE=$?
 
-  # All subsequent iterations use resume mode
-  USER_PROMPT="Resume mode: Read .afn/STATE.md and .afn/DESIGN.md, continue from where you left off. Do not ask questions, just work. IMPORTANT: Always keep at least one pending - [ ] task. When tasks run out, add polish/improvement tasks. NEVER signal that the project is finished."
+  # All subsequent iterations use resume mode (no task arg)
+  USER_PROMPT=$(build_prompt "")
 
-  # Check if agent explicitly shipped the project
+  echo ""
+  show_task_snapshot
+
+  # --- PAUSED: surface reason and exit cleanly ---
+  if is_paused; then
+    echo ""
+    warn "========================================="
+    warn "  ${BOLD}PAUSED for review${NC} (iter #$ITERATION)"
+    warn "========================================="
+    show_progress
+    show_current
+    # Print Last Status so user sees what needs decision
+    if [ -f "$STATE_FILE" ]; then
+      local_status=$(awk '/^## Last Status$/{flag=1; next} /^## /{flag=0} flag' "$STATE_FILE" | sed '/^$/d' | head -10)
+      if [ -n "$local_status" ]; then
+        echo -e "${YELLOW}Last Status:${NC}"
+        echo "$local_status" | sed 's/^/  /'
+      fi
+    fi
+    echo ""
+    info "Resume with: afn"
+    exit 0
+  fi
+
+  # --- SHIPPED: exit with success banner ---
   if is_shipped; then
     echo ""
     success "========================================="
@@ -183,23 +263,28 @@ while true; do
     exit 0
   fi
 
-  # Check if there are still pending tasks
+  # --- No pending tasks (but not shipped/paused): nudge or pause ---
   if ! has_pending && [ -f "$STATE_FILE" ]; then
     RETRY_COUNT=$((RETRY_COUNT + 1))
     if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-      warn "No pending tasks after $MAX_RETRIES iterations. The agent keeps completing all tasks."
-      warn "Restarting with explicit instructions to add new tasks..."
-      RETRY_COUNT=0
-      USER_PROMPT="Resume mode: Read .afn/STATE.md. ALL tasks are marked done but the project needs MORE WORK. Add at least 5 new tasks: polish, edge cases, performance, tests, improvements. Then work on them. NEVER run out of tasks."
+      warn "No pending tasks after $MAX_RETRIES iterations. Auto-pausing for user review."
+      # Write PAUSED status — respects the new protocol
+      if ! grep -q "^## Status:" "$STATE_FILE"; then
+        echo -e "\n## Status: PAUSED" >> "$STATE_FILE"
+      else
+        sed -i.bak 's/^## Status:.*/## Status: PAUSED/' "$STATE_FILE" && rm -f "$STATE_FILE.bak"
+      fi
+      warn "Re-run 'afn' after adding tasks or deciding to ship/close."
+      exit 0
     else
-      warn "No pending tasks. Telling agent to add more... ($RETRY_COUNT/$MAX_RETRIES)"
-      USER_PROMPT="Resume mode: Read .afn/STATE.md. You ran out of tasks but the project is NOT finished. Add new improvement tasks (polish, edge cases, performance, tests, accessibility, content improvements) and continue working. Keep at least 3 pending tasks at all times."
+      warn "No pending tasks. Asking agent to decide: ship or add polish ($RETRY_COUNT/$MAX_RETRIES)"
+      USER_PROMPT="Resume mode: All tasks marked done. Follow Ship Decision phase in SKILL.md: if finite project is genuinely complete, write '## Status: SHIPPED'. Otherwise add CONCRETE polish tasks with clear done-criteria (not vague '## Tasks - [ ] Improve'). Prefer '## Status: PAUSED' with a summary if the scope is unclear."
     fi
   else
     RETRY_COUNT=0
   fi
 
-  # Error handling
+  # --- Claude CLI error handling ---
   if [ $EXIT_CODE -ne 0 ]; then
     warn "Claude exit code: $EXIT_CODE — retrying in 5s..."
     sleep 5
