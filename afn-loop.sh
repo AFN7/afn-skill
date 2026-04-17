@@ -83,8 +83,11 @@ has_pending() {
 show_progress() {
   if [ -f "$STATE_FILE" ]; then
     local total done pct bar filled i
-    total=$(grep -c "^- \[.\]" "$STATE_FILE" 2>/dev/null || echo 0)
-    done=$(grep -c "^- \[x\]" "$STATE_FILE" 2>/dev/null || echo 0)
+    # grep -c always prints a number to stdout (even 0 on no match), so don't || echo 0
+    total=$(grep -c "^- \[.\]" "$STATE_FILE" 2>/dev/null)
+    done=$(grep -c "^- \[x\]" "$STATE_FILE" 2>/dev/null)
+    total=${total:-0}
+    done=${done:-0}
     if [ "$total" -gt 0 ]; then
       pct=$((done * 100 / total))
       bar=""
